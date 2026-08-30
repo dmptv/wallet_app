@@ -46,7 +46,6 @@ transaction history, and network status for an Ethereum address.
 
 ## Roadmap
 
-- DevTools integration (beyond the built-in Riverpod inspector)
 - Analytics wired through `ProviderObserver`
 - Crash reporting wired through `ProviderObserver`
 
