@@ -1,59 +1,48 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'features/network_status/network_status_screen.dart';
 import 'features/transactions/transaction_screen.dart';
+import 'main.dart';
+import 'wallet_config.dart';
 
-// widget that rebuild but keeps its state alive across rebuilds
-class HomeScreen extends StatefulWidget {
+class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
+  Widget build(BuildContext context, WidgetRef ref) {
+    final balance = ref.watch(balanceProvider);
+    final address = ref.watch(watchedAddressProvider);
 
-// Here state that survives rebuilds is kept in the State object, not in the widget itself. This allows the state to persist even when the widget is rebuilt due to changes in its parent or other factors.
-class _HomeScreenState extends State<HomeScreen> {
-
-  bool swapped = false;
-
-  @override
-  Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Wallet')),
-      body: Center(
+      body: SafeArea(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Row(
-              children: [
-                if (!swapped) ...[
-                    const CounterBox(key: ValueKey('a'), label: 'A'),
-                    const CounterBox(key: ValueKey('b'), label: 'B'),
-                  ] else ...[
-                    const CounterBox(key: ValueKey('b'), label: 'B'),
-                    const CounterBox(key: ValueKey('a'), label: 'A'),
-                  ]
-              ],
+            const _Header(),
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 24),
+                    _BalanceCard(balance: balance),
+                    const SizedBox(height: 24),
+                    _ActionRow(
+                      onHistory: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => const TransactionScreen()),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                // This button is just for display; it doesn't do anything
-                setState(() {
-                  swapped = !swapped;
-                  // Trigger a rebuild of the HomeScreen
-                });
-              },
-              child: const Text('Swap Elements'),
-            ),
-            const SizedBox(height: 12),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const TransactionScreen()),
-                );
-              },
-              child: const Text('Open Transactions'),
+            _NetworkStatusBar(
+              address: address,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const NetworkStatusScreen()),
+              ),
             ),
           ],
         ),
@@ -62,41 +51,151 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class CounterBox extends StatefulWidget { 
-  final String label;
-
-  const CounterBox({super.key, required this.label});
-  
-  @override
-  State<CounterBox> createState() => _CounterBoxState();
-}
-
-class _CounterBoxState extends State<CounterBox> {
-  int counter = 0;
-
-  @override
-  void initState() {
-    super.initState();
-    print('initState');
-  } 
+class _Header extends StatelessWidget {
+  const _Header();
 
   @override
   Widget build(BuildContext context) {
-    print('build, widget hash = ${identityHashCode(widget)}');
+    return const Padding(
+      padding: EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Text('Wallet', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
+  }
+}
 
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
+class _BalanceCard extends StatelessWidget {
+  final AsyncValue<double> balance;
+
+  const _BalanceCard({required this.balance});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Text('Total balance', style: TextStyle(fontSize: 14)),
+          const SizedBox(height: 8),
+          balance.when(
+            data: (value) => Text(
+              '${value.toStringAsFixed(5)} ETH',
+              style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold),
+            ),
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: CircularProgressIndicator(),
+            ),
+            error: (error, stackTrace) => const Text(
+              'Failed to load balance',
+              style: TextStyle(fontSize: 16),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionRow extends StatelessWidget {
+  final VoidCallback onHistory;
+
+  const _ActionRow({required this.onHistory});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        Text('${widget.label}: $counter', style: const TextStyle(fontSize: 40)),
-        ElevatedButton(
-          onPressed: () {
-            setState(() {
-              counter++;
-            });
-          },
-          child: const Text('Increment Counter'),
+        Expanded(
+          child: _ActionButton(icon: Icons.arrow_downward, label: 'Receive', isEnabled: false, onTap: () {}),
+        ),
+        Expanded(
+          child: _ActionButton(icon: Icons.send, label: 'Send', isEnabled: false, onTap: () {}),
+        ),
+        Expanded(
+          child: _ActionButton(icon: Icons.qr_code_scanner, label: 'Scan QR', isEnabled: false, onTap: () {}),
+        ),
+        Expanded(
+          child: _ActionButton(icon: Icons.history, label: 'History', isEnabled: true, onTap: onHistory),
         ),
       ],
+    );
+  }
+}
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isEnabled;
+  final VoidCallback onTap;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.isEnabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: [
+        IconButton(
+          onPressed: isEnabled ? onTap : null,
+          icon: Icon(icon),
+          style: IconButton.styleFrom(
+            backgroundColor: isEnabled ? scheme.primary : scheme.surfaceContainerHighest,
+            foregroundColor: isEnabled ? scheme.onPrimary : scheme.onSurfaceVariant,
+            shape: const CircleBorder(),
+            padding: const EdgeInsets.all(14),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(label, style: const TextStyle(fontSize: 12)),
+      ],
+    );
+  }
+}
+
+class _NetworkStatusBar extends StatelessWidget {
+  final String address;
+  final VoidCallback onTap;
+
+  const _NetworkStatusBar({required this.address, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final shortAddress = '${address.substring(0, 6)}...${address.substring(address.length - 4)}';
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          border: Border(top: BorderSide(color: Theme.of(context).dividerColor)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.circle, size: 10, color: Colors.green),
+            const SizedBox(width: 8),
+            Text(shortAddress, style: const TextStyle(fontSize: 13)),
+            const Spacer(),
+            const Text('Network status', style: TextStyle(fontSize: 13)),
+            const Icon(Icons.chevron_right, size: 16),
+          ],
+        ),
+      ),
     );
   }
 }

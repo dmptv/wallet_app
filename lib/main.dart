@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:wallet_app/counter_notifier.dart';
 import 'package:wallet_app/balance_notifier.dart';
 import 'package:wallet_app/home_screen.dart';
+import 'package:wallet_app/core/logging_observer.dart';
 
 
 final counterProvider = NotifierProvider<CounterNotifier, int>(CounterNotifier.new);
@@ -12,8 +13,9 @@ final balanceProvider = AsyncNotifierProvider<BalanceNotifier, double>(BalanceNo
 
 void main() {
   runApp(
-    const ProviderScope(
-      child: MyApp(),
+    ProviderScope(
+      observers: [LoggingObserver()],
+      child: const MyApp(),
     ),
   );
 }
