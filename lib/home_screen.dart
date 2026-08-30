@@ -3,22 +3,22 @@ import 'package:flutter/material.dart';
 import 'features/transactions/transaction_screen.dart';
 
 // widget that rebuild but keeps its state alive across rebuilds
-class TreeDemoScreen extends StatefulWidget {
-  const TreeDemoScreen({super.key});
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
 
   @override
-  State<TreeDemoScreen> createState() => _TreeDemoScreenState();
+  State<HomeScreen> createState() => _HomeScreenState();
 }
 
 // Here state that survives rebuilds is kept in the State object, not in the widget itself. This allows the state to persist even when the widget is rebuilt due to changes in its parent or other factors.
-class _TreeDemoScreenState extends State<TreeDemoScreen> {
+class _HomeScreenState extends State<HomeScreen> {
 
   bool swapped = false;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Tree Demo Screen')),
+      appBar: AppBar(title: const Text('Wallet')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -40,7 +40,7 @@ class _TreeDemoScreenState extends State<TreeDemoScreen> {
                 // This button is just for display; it doesn't do anything
                 setState(() {
                   swapped = !swapped;
-                  // Trigger a rebuild of the TreeDemoScreen
+                  // Trigger a rebuild of the HomeScreen
                 });
               },
               child: const Text('Swap Elements'),

@@ -2,12 +2,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:math';
 
 final balanceServiceProvider = Provider<BalanceService>((ref) {
-  return FakeBalanceService();
+  return InMemoryBalanceService();
 });
 
 abstract class BalanceService { Future<double> fetchBalance(); }
 
-class FakeBalanceService implements BalanceService {
+class InMemoryBalanceService implements BalanceService {
   
   @override
   Future<double> fetchBalance() async {

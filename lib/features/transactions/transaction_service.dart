@@ -1,59 +1,57 @@
-import 'dart:math';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:http/http.dart' as http;
 
 import 'models/transaction.dart';
 
+// Public Blockscout instance (Ethereum mainnet), no API key required.
+const _blockscoutBaseUrl = 'https://eth.blockscout.com/api/v2';
+
+// A well-known, publicly active address, used as the default "watched
+// wallet" so the transaction list has real, non-trivial history to show.
+final watchedAddressProvider = Provider<String>((ref) {
+  return '0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045';
+});
+
 final transactionServiceProvider = Provider<TransactionService>((ref) {
-  return FakeTransactionService();
+  return BlockscoutTransactionService(client: http.Client());
 });
 
 abstract class TransactionService {
-  Future<List<Transaction>> fetchTransactions();
+  Future<List<Transaction>> fetchTransactions(String address);
 }
 
-class FakeTransactionService implements TransactionService {
-  static const _categories = [
-    'Groceries',
-    'Transport',
-    'Entertainment',
-    'Utilities',
-    'Salary',
-    'Dining',
-    'Health',
-  ];
+class BlockscoutApiException implements Exception {
+  final int statusCode;
+  final String message;
 
-  static const _merchants = [
-    'Whole Foods',
-    'Uber',
-    'Netflix',
-    'City Power Co',
-    'Acme Corp',
-    'Local Cafe',
-    'Pharmacy',
-  ];
+  BlockscoutApiException(this.statusCode, this.message);
 
   @override
-  Future<List<Transaction>> fetchTransactions() async {
-    await Future.delayed(const Duration(milliseconds: 800));
+  String toString() => 'BlockscoutApiException($statusCode): $message';
+}
 
-    final random = Random();
-    final now = DateTime.now();
+class BlockscoutTransactionService implements TransactionService {
+  final http.Client client;
 
-    return List.generate(300, (i) {
-      final categoryIndex = random.nextInt(_categories.length);
-      final isSalary = _categories[categoryIndex] == 'Salary';
+  BlockscoutTransactionService({required this.client});
 
-      return Transaction(
-        id: 'txn_$i',
-        amount: isSalary
-            ? 2000 + random.nextInt(1000).toDouble()
-            : 5 + random.nextInt(300).toDouble(),
-        category: _categories[categoryIndex],
-        date: now.subtract(Duration(hours: random.nextInt(24 * 90))),
-        merchant: _merchants[categoryIndex],
-        type: isSalary ? TransactionType.income : TransactionType.expense,
-      );
-    });
+  @override
+  Future<List<Transaction>> fetchTransactions(String address) async {
+    final uri = Uri.parse('$_blockscoutBaseUrl/addresses/$address/transactions');
+    final response = await client.get(uri);
+
+    if (response.statusCode != 200) {
+      throw BlockscoutApiException(response.statusCode, response.body);
+    }
+
+    final body = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = body['items'] as List<dynamic>;
+
+    return items
+        .cast<Map<String, dynamic>>()
+        .map((json) => Transaction.fromBlockscoutJson(json, watchedAddress: address))
+        .toList();
   }
 }

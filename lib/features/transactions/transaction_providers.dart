@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'models/transaction.dart';
 import 'transaction_service.dart';
 
-// Level 1: raw data, single source of truth.
+// Level 1: raw data from the real Blockscout API — single source of truth.
 class RawTransactionsNotifier extends AsyncNotifier<List<Transaction>> {
   @override
   Future<List<Transaction>> build() async {
-    return ref.read(transactionServiceProvider).fetchTransactions();
+    final address = ref.watch(watchedAddressProvider);
+    return ref.read(transactionServiceProvider).fetchTransactions(address);
   }
 }
 
@@ -18,15 +19,19 @@ final rawTransactionsProvider =
 
 // Level 2: filter state, independent branch of the graph.
 class TransactionFilter {
-  final String? category;
-  final double minAmount;
+  final TransactionDirection? direction;
+  final double minValueEth;
 
-  const TransactionFilter({this.category, this.minAmount = 0});
+  const TransactionFilter({this.direction, this.minValueEth = 0});
 
-  TransactionFilter copyWith({String? category, double? minAmount, bool clearCategory = false}) {
+  TransactionFilter copyWith({
+    TransactionDirection? direction,
+    double? minValueEth,
+    bool clearDirection = false,
+  }) {
     return TransactionFilter(
-      category: clearCategory ? null : (category ?? this.category),
-      minAmount: minAmount ?? this.minAmount,
+      direction: clearDirection ? null : (direction ?? this.direction),
+      minValueEth: minValueEth ?? this.minValueEth,
     );
   }
 }
@@ -35,14 +40,14 @@ class TransactionFilterNotifier extends Notifier<TransactionFilter> {
   @override
   TransactionFilter build() => const TransactionFilter();
 
-  void setCategory(String? category) {
-    state = category == null
-        ? state.copyWith(clearCategory: true)
-        : state.copyWith(category: category);
+  void setDirection(TransactionDirection? direction) {
+    state = direction == null
+        ? state.copyWith(clearDirection: true)
+        : state.copyWith(direction: direction);
   }
 
-  void setMinAmount(double minAmount) {
-    state = state.copyWith(minAmount: minAmount);
+  void setMinValueEth(double minValueEth) {
+    state = state.copyWith(minValueEth: minValueEth);
   }
 }
 
@@ -57,49 +62,46 @@ final filteredTransactionsProvider = Provider<List<Transaction>>((ref) {
   final filter = ref.watch(transactionFilterProvider);
 
   return raw.where((t) {
-    if (filter.category != null && t.category != filter.category) return false;
-    if (t.amount < filter.minAmount) return false;
+    if (filter.direction != null && t.direction != filter.direction) return false;
+    if (t.valueEth < filter.minValueEth) return false;
     return true;
   }).toList();
 });
 
 // Level 4: grouped view derived from level 3.
-final groupedByCategoryProvider = Provider<Map<String, List<Transaction>>>((ref) {
+final groupedByDirectionProvider = Provider<Map<TransactionDirection, List<Transaction>>>((ref) {
   final filtered = ref.watch(filteredTransactionsProvider);
-  final map = <String, List<Transaction>>{};
+  final map = <TransactionDirection, List<Transaction>>{};
   for (final t in filtered) {
-    map.putIfAbsent(t.category, () => []).add(t);
+    map.putIfAbsent(t.direction, () => []).add(t);
   }
   return map;
 });
 
 // Level 5: aggregate totals derived from level 4.
-final categoryTotalsProvider = Provider<Map<String, double>>((ref) {
-  final grouped = ref.watch(groupedByCategoryProvider);
-  return grouped.map((category, txns) {
-    final total = txns.fold<double>(0, (sum, t) => sum + t.amount);
-    return MapEntry(category, total);
+final directionTotalsProvider = Provider<Map<TransactionDirection, double>>((ref) {
+  final grouped = ref.watch(groupedByDirectionProvider);
+  return grouped.map((direction, txns) {
+    final total = txns.fold<double>(0, (sum, t) => sum + t.valueEth);
+    return MapEntry(direction, total);
   });
 });
 
-// Level 6: single scalar derived from level 5.
-final topCategoryProvider = Provider<String?>((ref) {
-  final totals = ref.watch(categoryTotalsProvider);
-  if (totals.isEmpty) return null;
-  return totals.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
-});
-
-// Level 6b: balance summary derived straight from level 3 (a sibling of the grouping branch).
+// Level 6: net balance change derived from level 5.
 final filteredBalanceProvider = Provider<double>((ref) {
-  final filtered = ref.watch(filteredTransactionsProvider);
-  return filtered.fold<double>(0, (sum, t) {
-    return sum + (t.type == TransactionType.income ? t.amount : -t.amount);
-  });
+  final totals = ref.watch(directionTotalsProvider);
+  final incoming = totals[TransactionDirection.incoming] ?? 0;
+  final outgoing = totals[TransactionDirection.outgoing] ?? 0;
+  return incoming - outgoing;
 });
 
-// Distinct categories available for the filter chips row — derived from raw data only,
-// so it stays stable while the filter itself changes.
-final availableCategoriesProvider = Provider<List<String>>((ref) {
+// Distinct set of counterparty addresses — derived from raw data only, so it
+// stays stable while the filter itself changes.
+final counterpartyCountProvider = Provider<int>((ref) {
   final raw = ref.watch(rawTransactionsProvider).value ?? const [];
-  return raw.map((t) => t.category).toSet().toList()..sort();
+  final address = ref.watch(watchedAddressProvider).toLowerCase();
+  final counterparties = raw.map((t) {
+    return t.from.toLowerCase() == address ? t.to.toLowerCase() : t.from.toLowerCase();
+  }).toSet();
+  return counterparties.length;
 });
