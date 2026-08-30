@@ -1,0 +1,77 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:wallet_app/counter_notifier.dart';
+import 'package:wallet_app/balance_notifier.dart';
+import 'package:wallet_app/fake_screen.dart';
+
+
+final counterProvider = NotifierProvider<CounterNotifier, int>(CounterNotifier.new);
+
+final balanceProvider = AsyncNotifierProvider<BalanceNotifier, double>(BalanceNotifier.new, isAutoDispose: true); // Set isAutoDispose to false to keep the state alive
+
+
+void main() {
+  runApp(
+    const ProviderScope(
+      child: MyApp(),
+    ),
+  );
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  // This widget is the root of your application.
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Flutter Demo',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+      ),
+      home: TreeDemoScreen(),
+    );
+  }
+}
+
+class MyHomePage extends ConsumerWidget {
+  const MyHomePage({super.key});
+  
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Riverpod Balance Example')),
+      body: Center(
+        child: ref.watch(balanceProvider).when(
+          data: (v) => Text('$v', style: const TextStyle(fontSize: 40)),
+          loading: () => const CircularProgressIndicator(),
+          error: (error, stackTrace) => Text('Error: $error'),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const FakeScreen()),
+          );
+        },
+        child: const Icon(Icons.navigate_next),
+      ),
+    );
+  }
+}
+
+class FakeScreen extends ConsumerWidget {
+  const FakeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Fake Screen')),
+      body: Center(
+        child: Text('Fake Screen', style: const TextStyle(fontSize: 40)),
+      ),
+    );
+  }
+}
