@@ -44,6 +44,12 @@ transaction history, and network status for an Ethereum address.
   syncs silently, and a failed refresh degrades gracefully instead of
   losing data
 
+## Roadmap
+
+- DevTools integration (beyond the built-in Riverpod inspector)
+- Analytics wired through `ProviderObserver`
+- Crash reporting wired through `ProviderObserver`
+
 ## Getting Started
 
 ```bash
