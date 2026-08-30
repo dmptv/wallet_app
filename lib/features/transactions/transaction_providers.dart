@@ -2,14 +2,69 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../wallet_config.dart';
 import 'models/transaction.dart';
+import 'transaction_cache.dart';
 import 'transaction_service.dart';
 
-// Level 1: raw data from the real Blockscout API — single source of truth.
+enum TransactionSyncStatus { idle, syncing, offline }
+
+class TransactionSyncNotifier extends Notifier<TransactionSyncStatus> {
+  @override
+  TransactionSyncStatus build() => TransactionSyncStatus.idle;
+
+  void setStatus(TransactionSyncStatus status) => state = status;
+}
+
+final transactionSyncStatusProvider =
+    NotifierProvider<TransactionSyncNotifier, TransactionSyncStatus>(
+  TransactionSyncNotifier.new,
+);
+
+// Level 1: raw data — offline-first. Cached data (if any) is shown
+// immediately, then a live fetch runs in the background and replaces it.
+// If the background fetch fails, the cached data stays on screen and
+// transactionSyncStatusProvider flips to .offline instead of surfacing an
+// error state.
 class RawTransactionsNotifier extends AsyncNotifier<List<Transaction>> {
   @override
   Future<List<Transaction>> build() async {
     final address = ref.watch(watchedAddressProvider);
-    return ref.read(transactionServiceProvider).fetchTransactions(address);
+    final cached = await ref.read(transactionCacheProvider).load(address);
+
+    if (cached != null) {
+      // Don't await — let the cached data render first, sync in the background.
+      Future.microtask(refresh);
+      return cached;
+    }
+
+    return _fetchAndCache(address);
+  }
+
+  Future<void> refresh() async {
+    final address = ref.read(watchedAddressProvider);
+    final syncNotifier = ref.read(transactionSyncStatusProvider.notifier);
+    syncNotifier.setStatus(TransactionSyncStatus.syncing);
+
+    try {
+      final fresh = await _fetchAndCache(address);
+      if (ref.mounted) {
+        state = AsyncValue.data(fresh);
+        syncNotifier.setStatus(TransactionSyncStatus.idle);
+      }
+    } catch (e, st) {
+      if (!ref.mounted) return;
+      syncNotifier.setStatus(TransactionSyncStatus.offline);
+      // Keep whatever data is already on screen (cached or previous fetch);
+      // only surface a hard error state if we have nothing to show at all.
+      if (state.value == null) {
+        state = AsyncValue.error(e, st);
+      }
+    }
+  }
+
+  Future<List<Transaction>> _fetchAndCache(String address) async {
+    final fresh = await ref.read(transactionServiceProvider).fetchTransactions(address);
+    await ref.read(transactionCacheProvider).save(address, fresh);
+    return fresh;
   }
 }
 

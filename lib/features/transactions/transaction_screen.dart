@@ -13,9 +13,38 @@ class TransactionScreen extends StatelessWidget {
       appBar: AppBar(title: const Text('Transaction History')),
       body: const Column(
         children: [
+          OfflineBanner(),
           BalanceSummaryCard(),
           DirectionChipsRow(),
           Expanded(child: TransactionListView()),
+        ],
+      ),
+    );
+  }
+}
+
+// Reads only the sync status via select — only rebuilds (and only occupies
+// layout space) when offline, so it doesn't affect other widgets' rebuilds.
+class OfflineBanner extends ConsumerWidget {
+  const OfflineBanner({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(transactionSyncStatusProvider);
+
+    if (status != TransactionSyncStatus.offline) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      width: double.infinity,
+      color: Colors.orange.shade100,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: const Row(
+        children: [
+          Icon(Icons.cloud_off, size: 16, color: Colors.deepOrange),
+          SizedBox(width: 8),
+          Text('Offline — showing cached data', style: TextStyle(fontSize: 13)),
         ],
       ),
     );

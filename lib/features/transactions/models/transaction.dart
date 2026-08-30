@@ -40,4 +40,28 @@ class Transaction {
           : TransactionDirection.outgoing,
     );
   }
+
+  Map<String, dynamic> toCacheJson() => {
+        'hash': hash,
+        'from': from,
+        'to': to,
+        'valueWei': valueWei.toString(),
+        'gasUsed': gasUsed,
+        'status': status,
+        'timestamp': timestamp.toIso8601String(),
+        'direction': direction.name,
+      };
+
+  factory Transaction.fromCacheJson(Map<String, dynamic> json) {
+    return Transaction(
+      hash: json['hash'] as String,
+      from: json['from'] as String,
+      to: json['to'] as String,
+      valueWei: BigInt.parse(json['valueWei'] as String),
+      gasUsed: json['gasUsed'] as int,
+      status: json['status'] as String,
+      timestamp: DateTime.parse(json['timestamp'] as String),
+      direction: TransactionDirection.values.byName(json['direction'] as String),
+    );
+  }
 }
