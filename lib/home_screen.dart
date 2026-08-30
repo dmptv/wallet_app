@@ -11,7 +11,10 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final balance = ref.watch(balanceProvider);
+    // Only watchedAddressProvider is watched here — it's a static Provider,
+    // so it never changes at runtime and never triggers a rebuild. The
+    // balance itself is watched inside _BalanceCard, so the 5s balance poll
+    // only rebuilds that card, not the whole screen (buttons, status bar).
     final address = ref.watch(watchedAddressProvider);
 
     return Scaffold(
@@ -25,7 +28,7 @@ class HomeScreen extends ConsumerWidget {
                 child: Column(
                   children: [
                     const SizedBox(height: 24),
-                    _BalanceCard(balance: balance),
+                    const _BalanceCard(),
                     const SizedBox(height: 24),
                     _ActionRow(
                       onHistory: () => Navigator.push(
@@ -67,13 +70,13 @@ class _Header extends StatelessWidget {
   }
 }
 
-class _BalanceCard extends StatelessWidget {
-  final AsyncValue<double> balance;
-
-  const _BalanceCard({required this.balance});
+class _BalanceCard extends ConsumerWidget {
+  const _BalanceCard();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final balance = ref.watch(balanceProvider);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 28),
