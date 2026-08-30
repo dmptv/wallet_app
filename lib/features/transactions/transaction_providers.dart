@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../wallet_config.dart';
 import 'models/transaction.dart';
 import 'transaction_service.dart';
 

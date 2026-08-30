@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'dart:async'; 
+import 'dart:async';
 import 'balance_service.dart';
+import 'wallet_config.dart';
 
 final pollIntervalProvider = Provider<Duration>((ref) => const Duration(seconds: 5));
 
@@ -19,7 +20,8 @@ class BalanceNotifier extends AsyncNotifier<double> {
       print('BalanceNotifier disposed and timer cancelled');
     });
 
-    return await ref.read(balanceServiceProvider).fetchBalance();
+    final address = ref.read(watchedAddressProvider);
+    return await ref.read(balanceServiceProvider).fetchBalance(address);
   }
 
   Future<void> refresh() async {
@@ -29,7 +31,8 @@ class BalanceNotifier extends AsyncNotifier<double> {
     state = const AsyncValue.loading();
 
     try {
-      final newBalance = await ref.read(balanceServiceProvider).fetchBalance();
+      final address = ref.read(watchedAddressProvider);
+      final newBalance = await ref.read(balanceServiceProvider).fetchBalance(address);
       if (ref.mounted) {
         state = AsyncValue.data(newBalance);
       }

@@ -50,7 +50,7 @@ class SpyBalanceService implements BalanceService {
   SpyBalanceService({this.delay = Duration.zero});
 
   @override
-  Future<double> fetchBalance() async {
+  Future<double> fetchBalance(String address) async {
     callCount++;
     await Future.delayed(delay);
     return 42.0; // Return a fixed balance for testing
